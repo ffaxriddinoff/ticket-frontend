@@ -1,15 +1,20 @@
 <script setup lang="ts">
+import { useLocale } from '../lib/i18n'
 import AppIcon from './AppIcon.vue'
 import { useWatches } from '../composables/useWatches'
 import { useNotice } from '../composables/useNotice'
+import { useStations } from '../composables/useStations'
 import { apiErrorMessage } from '../lib/api'
 import { formatTravelDate, todayInUzbekistan } from '../lib/dates'
-import { positions, wagonTypes } from '../types/watch'
+import { positions, trainClasses, wagonTypes } from '../types/watch'
 import type { Watch } from '../types/watch'
+
+const { t } = useLocale()
 
 const props = defineProps<{ watch: Watch }>()
 const { removeWatch, deletingIds } = useWatches()
 const { notify } = useNotice()
+const { stationName } = useStations()
 
 async function remove() {
   if (deletingIds.value.has(props.watch.id)) return
@@ -24,24 +29,47 @@ async function remove() {
 
 <template>
   <article class="draft-card" :aria-busy="deletingIds.has(watch.id)">
-    <div class="draft-card-heading">
-      <span class="badge badge-green"><AppIcon name="check" :size="13" /> Saqlangan</span>
-      <span v-if="watch.trip_date < todayInUzbekistan()" class="caption text-warning">Sana o‘tgan</span>
-      <span v-else class="caption text-muted">Hisobingizda</span>
+    <div v-if="watch.trip_date < todayInUzbekistan()" class="draft-card-heading">
+      <span class="caption text-warning">{{ t('Sana o‘tgan') }}</span>
     </div>
-    <div class="draft-route"><strong>{{ watch.from }}</strong><AppIcon name="arrow" :size="19" /><strong>{{ watch.to }}</strong></div>
+    <div class="draft-route"><strong>{{ stationName(watch.from) }}</strong><AppIcon name="arrow" :size="19" /><strong>{{ stationName(watch.to) }}</strong></div>
     <p class="draft-date"><AppIcon name="calendar" :size="16" /> {{ formatTravelDate(watch.trip_date) }}</p>
     <div class="draft-tags">
-      <span>{{ positions.find((item) => item.value === watch.filters.position)?.label }} joy</span>
-      <span>{{ watch.filters.zone === 'no_side' ? 'Yon joylarsiz' : 'Hamma zona' }}</span>
-      <span v-if="!watch.filters.wagon_types.length">Barcha vagonlar</span>
-      <span v-for="type in watch.filters.wagon_types" :key="type">{{ wagonTypes.find((item) => item.value === type)?.label }}</span>
-      <span v-for="train in watch.filters.trains" :key="`train-${train}`">Poyezd: {{ train }}</span>
-      <span v-for="trainClass in watch.filters.classes" :key="`class-${trainClass}`">Klass: {{ trainClass }}</span>
+      <span>{{ t(positions.find((item) => item.value === watch.filters.position)?.label ?? '') }} {{ t('joy') }}</span>
+      <span>{{ watch.filters.zone === 'no_side' ? t('Yon joylarsiz') : t('Hamma zona') }}</span>
+      <span v-if="!watch.filters.wagon_types.length">{{ t('Barcha vagonlar') }}</span>
+      <span v-for="type in watch.filters.wagon_types" :key="type">{{ t(wagonTypes.find((item) => item.value === type)?.label ?? '') }}</span>
+      <span v-for="train in watch.filters.trains" :key="`train-${train}`">{{ t('Poyezd:') }} {{ train }}</span>
+      <span v-for="trainClass in watch.filters.classes" :key="`class-${trainClass}`">{{ t('Klass:') }} {{ t(trainClasses.find((option) => option.value === trainClass)?.label ?? trainClass) }}</span>
     </div>
-    <div class="draft-card-footer">
-      <span class="caption text-muted">{{ deletingIds.has(watch.id) ? 'O‘chirilmoqda…' : 'Hisobingizda saqlangan' }}</span>
-      <button class="icon-button danger-button" type="button" :disabled="deletingIds.has(watch.id)" :aria-label="`${watch.from} — ${watch.to} kuzatuvini o‘chirish`" @click="remove"><AppIcon name="trash" :size="17" /></button>
+    <div class="watch-card-actions">
+      <!-- Enable resume/edit after their backend API contracts are available. -->
+      <button class="watch-card-action watch-action-resume" type="button" disabled :title="t('Tez orada')">
+        <span class="watch-action-icon"><AppIcon name="play" :size="19" /></span>
+        <span>{{ t('Davom') }}</span>
+      </button>
+      <button class="watch-card-action watch-action-edit" type="button" disabled :title="t('Tez orada')">
+        <span class="watch-action-icon"><AppIcon name="edit" :size="19" /></span>
+        <span>{{ t('Tahrirlash') }}</span>
+      </button>
+      <button class="watch-card-action watch-action-delete" type="button" :disabled="deletingIds.has(watch.id)" :aria-label="`${stationName(watch.from)} — ${stationName(watch.to)}: ${t('Kuzatuvni o‘chirish')}`" @click="remove">
+        <span class="watch-action-icon"><AppIcon :name="deletingIds.has(watch.id) ? 'clock' : 'trash'" :size="19" /></span>
+        <span>{{ deletingIds.has(watch.id) ? t('O‘chirilmoqda…') : t('O‘chirish') }}</span>
+      </button>
     </div>
   </article>
 </template>
+
+<style scoped>
+.watch-card-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-top: 9px; border-top: 1px solid #eef1e9; }
+.watch-card-action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 64px; padding: 6px 3px; border: 0; border-radius: 10px; background: transparent; color: var(--action-color); font-size: 10px; line-height: 1.5; font-weight: 750; transition: background .15s; }
+.watch-card-action:disabled { opacity: 1; }
+.watch-card-action:disabled > span:last-child { opacity: .65; }
+.watch-card-action:not(:disabled):hover { background: var(--action-background); }
+.watch-card-action:focus-visible { outline-color: var(--action-color); outline-offset: 2px; }
+.watch-action-icon { display: grid; place-items: center; width: 34px; height: 32px; border-radius: 9px; background: var(--action-background); }
+.watch-action-resume { --action-color: #15945b; --action-background: #eaf8ef; }
+.watch-action-edit { --action-color: #2789d2; --action-background: #edf5ff; }
+.watch-action-delete { --action-color: #d85858; --action-background: #fff0ed; }
+.watch-action-resume .watch-action-icon :deep(svg) { fill: currentColor; stroke: none; }
+</style>

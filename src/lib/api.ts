@@ -2,6 +2,9 @@ import { isValidDate } from './dates'
 import type { UserProfile } from '../types/user'
 import { positions, wagonTypes, zones } from '../types/watch'
 import type { CreateWatchInput, Watch, WatchFilters } from '../types/watch'
+import type { Station } from '../types/station'
+import type { Locale } from './i18n'
+import type { Train, TrainSearchParams } from '../types/train'
 
 export class ApiError extends Error {
   constructor(
@@ -30,18 +33,18 @@ function errorFields(value: unknown): Record<string, string[]> {
   return fields
 }
 
-async function request(path: string, initData: string, options: RequestInit = {}) {
-  if (!initData) throw new ApiError(401, 'unauthorized')
+async function request(path: string, initData: string, options: RequestInit = {}, allowAnonymous = false, timeoutMs = 12_000) {
+  if (!initData && !allowAnonymous) throw new ApiError(401, 'unauthorized')
   const controller = new AbortController()
   const abort = () => controller.abort()
   const signal = options.signal
   if (signal?.aborted) controller.abort()
   else signal?.addEventListener('abort', abort, { once: true })
-  const timeout = window.setTimeout(abort, 12_000)
+  const timeout = window.setTimeout(abort, timeoutMs)
 
   try {
     const headers = new Headers(options.headers)
-    headers.set('Authorization', `tma ${initData}`)
+    if (initData) headers.set('Authorization', `tma ${initData}`)
     headers.set('Accept', 'application/json')
     if (options.body) headers.set('Content-Type', 'application/json')
     const response = await fetch(path, {
@@ -77,8 +80,24 @@ export async function getProfile(initData: string, signal: AbortSignal): Promise
   return body.data
 }
 
+export async function getStations(language: Locale, initData: string, signal?: AbortSignal): Promise<Station[]> {
+  const { response, body } = await request(`/api/v1/stations?lang=${language}`, initData, { signal }, true)
+  if (!isRecord(body) || !Array.isArray(body.data) || !body.data.length) {
+    throw new ApiError(response.status, 'invalid_response')
+  }
+  const codes = new Set<string>()
+  return body.data.map((value: unknown) => {
+    if (!isRecord(value) || typeof value.code !== 'string' || !/^\d{7}$/.test(value.code)
+      || typeof value.name !== 'string' || !value.name.trim() || codes.has(value.code)) {
+      throw new ApiError(response.status, 'invalid_response')
+    }
+    codes.add(value.code)
+    return { code: value.code, name: value.name }
+  })
+}
+
 export async function getWatches(initData: string, signal?: AbortSignal): Promise<Watch[]> {
-  const { response, body } = await request('/api/v1/watches', initData, { signal })
+  const { response, body } = await request('/api/v1/watches', initData, { signal }, true)
   if (!isRecord(body) || !Array.isArray(body.data)) {
     throw new ApiError(response.status, 'invalid_response')
   }
@@ -89,6 +108,41 @@ export async function getWatches(initData: string, signal?: AbortSignal): Promis
   })
 }
 
+export async function getTrains(input: TrainSearchParams, initData: string, signal?: AbortSignal): Promise<Train[]> {
+  const query = new URLSearchParams({
+    from: input.from,
+    to: input.to,
+    trip_date: input.trip_date,
+    lang: input.lang,
+  })
+  const { response, body } = await request(`/api/v1/trains?${query}`, initData, { signal }, true, 20_000)
+  if (!isRecord(body) || !Array.isArray(body.data)) {
+    throw new ApiError(response.status, 'invalid_response')
+  }
+
+  const numbers = new Set<string>()
+  return body.data.map((value: unknown) => {
+    if (!isRecord(value) || typeof value.number !== 'string' || !value.number.trim() || value.number.length > 100
+      || numbers.has(value.number) || typeof value.brand !== 'string'
+      || !isTrainDate(value.departure_date) || !isTrainDate(value.arrival_date)) {
+      throw new ApiError(response.status, 'invalid_response')
+    }
+    numbers.add(value.number)
+    return {
+      number: value.number,
+      brand: value.brand,
+      departure_date: value.departure_date,
+      arrival_date: value.arrival_date,
+    }
+  })
+}
+
+function isTrainDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const parts = /^(\d{2})\.(\d{2})\.(\d{4}) ([01]\d|2[0-3]):([0-5]\d)$/.exec(value)
+  return !!parts && isValidDate(`${parts[3]}-${parts[2]}-${parts[1]}`)
+}
+
 export async function createWatch(
   initData: string,
   input: CreateWatchInput,
@@ -96,7 +150,7 @@ export async function createWatch(
 ): Promise<Watch> {
   const { response, body } = await request('/api/v1/watches', initData, {
     method: 'POST', body: JSON.stringify(input), signal,
-  })
+  }, true)
   const watch = isRecord(body) ? parseWatch(body.data) : null
   if (!watch) throw new ApiError(response.status, 'invalid_response')
   return watch
@@ -105,15 +159,16 @@ export async function createWatch(
 export async function deleteWatch(initData: string, id: number, signal?: AbortSignal): Promise<void> {
   const { response } = await request(`/api/v1/watches/${id}`, initData, {
     method: 'DELETE', signal,
-  })
+  }, true)
   if (response.status !== 204) throw new ApiError(response.status, 'invalid_response')
 }
 
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return 'Kirish muddati tugagan. Mini App’ni yopib, qayta oching.'
+    if (error.status === 401) return 'Telegram orqali kirish talab qilinadi. Mini App’ni Telegram’dan oching yoki qayta ishga tushiring.'
     if (error.code === 'auth_unavailable') return 'Telegram orqali kirish vaqtincha ishlamayapti. Birozdan so‘ng qayta urinib ko‘ring.'
     if (error.code === 'invalid_response') return 'Server javobini o‘qib bo‘lmadi. Qayta urinib ko‘ring.'
+    if (error.code === 'train_search_timeout' || error.status === 504) return 'Server javobi kechikdi. Qayta urinib ko‘ring.'
     if (error.status === 422) return 'Kiritilgan ma’lumotlarni tekshiring.'
     if (error.status === 404) return 'Kuzatuv topilmadi. Ro‘yxatni yangilang.'
   }

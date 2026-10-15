@@ -1,3 +1,5 @@
+import { useLocale } from './i18n'
+
 export function todayInUzbekistan(): string {
   return dateInUzbekistan(new Date())
 }
@@ -18,6 +20,12 @@ export function isValidDate(value: string): boolean {
 
 export function formatTravelDate(value: string): string {
   if (!isValidDate(value)) return value
+  const { locale } = useLocale()
+  if (locale.value !== 'uz') {
+    return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-GB', {
+      timeZone: 'Asia/Tashkent', day: 'numeric', month: 'long', year: 'numeric',
+    }).format(new Date(`${value}T12:00:00Z`))
+  }
   // Some WebViews lack uz-UZ month names, so keep the calendar labels explicit.
   const months = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
   const [year, month, day] = value.split('-')

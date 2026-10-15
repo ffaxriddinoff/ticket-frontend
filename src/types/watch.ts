@@ -1,6 +1,7 @@
 export type Position = 'all' | 'lower' | 'upper'
 export type Zone = 'all' | 'no_side'
 export type WagonType = 'seated' | 'platzkart' | 'coupe' | 'lux' | 'soft' | 'sv' | 'general'
+export type TrainClass = 'economy' | 'business' | 'vip'
 
 export const positions: { value: Position; label: string }[] = [
   { value: 'all', label: 'Barchasi' },
@@ -20,6 +21,11 @@ export const wagonTypes: { value: WagonType; label: string }[] = [
   { value: 'sv', label: 'SV' },
   { value: 'general', label: 'Umumiy' },
 ]
+export const trainClasses: { value: TrainClass; label: string }[] = [
+  { value: 'economy', label: 'Ekonom' },
+  { value: 'business', label: 'Biznes' },
+  { value: 'vip', label: 'VIP' },
+]
 
 export interface WatchFilters {
   trains: string[]
@@ -30,6 +36,7 @@ export interface WatchFilters {
 }
 
 export interface CreateWatchInput {
+  // Station codes are submitted; localized station names are only displayed.
   from: string
   to: string
   trip_date: string
@@ -51,6 +58,8 @@ export interface DraftInput {
   position: Position
   zone: Zone
   wagonTypes: WagonType[]
+  // Optional for drafts saved before train selection was available.
+  trains?: string[]
 }
 
 export interface WatchDraft extends DraftInput {

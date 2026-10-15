@@ -2,11 +2,13 @@
 defineProps<{ name: string; size?: number }>()
 
 const paths: Record<string, string[]> = {
+  globe: ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'M2 12h20M12 2a19 19 0 0 1 0 20 19 19 0 0 1 0-20Z'],
   train: ['M8 3h8a4 4 0 0 1 4 4v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a4 4 0 0 1 4-4Z', 'M4 11h16M12 3v8M8 20l-2 2m10-2 2 2M8 16h.01M16 16h.01'],
   home: ['m3 10 9-7 9 7', 'M5 9v12h5v-7h4v7h5V9'],
   bell: ['M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9', 'M10 21h4'],
   user: ['M20 21v-2a7 7 0 0 0-14 0v2', 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z'],
   plus: ['M12 5v14M5 12h14'],
+  play: ['m8 5 11 7-11 7V5Z'],
   arrow: ['M4 12h16m-6-6 6 6-6 6'],
   back: ['M20 12H4m6-6-6 6 6 6'],
   chevron: ['m9 5 7 7-7 7'],

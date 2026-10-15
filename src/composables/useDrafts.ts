@@ -34,6 +34,8 @@ function isStoredDraft(value: unknown): value is WatchDraft {
     && zones.some((option) => option.value === item.zone)
     && Array.isArray(item.wagonTypes) && item.wagonTypes.length <= wagonTypes.length
     && item.wagonTypes.every((type: unknown) => wagonTypes.some((option) => option.value === type))
+    && (item.trains === undefined || (Array.isArray(item.trains)
+      && item.trains.every((number: unknown) => typeof number === 'string' && number.trim().length > 0 && number.length <= 100)))
 }
 
 function loadDrafts() {
@@ -63,20 +65,6 @@ function persist(next: WatchDraft[]): boolean {
   }
 }
 
-function saveDraft(input: DraftInput, id?: string): { ok: boolean; message?: string } {
-  if (Object.keys(validateDraft(input)).length) return { ok: false, message: 'Marshrut va sanani tekshiring.' }
-  if (!id && drafts.value.length >= 50) return { ok: false, message: '50 ta qoralama saqlangan. Avval keraksizlarini o‘chiring.' }
-  if (id && !drafts.value.some((draft) => draft.id === id)) return { ok: false, message: 'Qoralama topilmadi. Sahifani yangilang.' }
-  const draft: WatchDraft = {
-    ...input,
-    from: input.from.trim(), to: input.to.trim(),
-    wagonTypes: [...new Set(input.wagonTypes)],
-    id: id || crypto.randomUUID(), updatedAt: new Date().toISOString(),
-  }
-  const saved = persist([draft, ...drafts.value.filter((item) => item.id !== draft.id)])
-  return { ok: saved, message: saved ? undefined : storageMessage.value }
-}
-
 function removeDraft(id: string): boolean {
   return persist(drafts.value.filter((draft) => draft.id !== id))
 }
@@ -86,5 +74,5 @@ export function useDrafts() {
     initialized = true
     loadDrafts()
   }
-  return { drafts: shallowReadonly(drafts), storageMessage: shallowReadonly(storageMessage), saveDraft, removeDraft }
+  return { drafts: shallowReadonly(drafts), storageMessage: shallowReadonly(storageMessage), removeDraft }
 }

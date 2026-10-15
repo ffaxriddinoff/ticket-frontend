@@ -2,6 +2,7 @@ import { computed, readonly, ref } from 'vue'
 import { ApiError, getProfile } from '../lib/api'
 import { getTelegramWebApp } from '../lib/telegram'
 import type { UserProfile } from '../types/user'
+import { t } from '../lib/i18n'
 
 const profile = ref<UserProfile | null>(null)
 const state = ref<'browser' | 'loading' | 'authenticated' | 'error'>('browser')
@@ -50,7 +51,7 @@ async function loadProfile() {
 export function useProfile() {
   return {
     profile: readonly(profile), state: readonly(state), errorMessage: readonly(errorMessage),
-    displayName: computed(() => profile.value?.display_name || 'Sayohatchi'),
+    displayName: computed(() => profile.value?.display_name || t('Sayohatchi')),
     initials: computed(() => (profile.value?.display_name || 'S').split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()),
     loadProfile,
   }

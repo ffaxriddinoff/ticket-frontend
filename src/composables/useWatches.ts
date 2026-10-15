@@ -16,11 +16,12 @@ let mutationVersion = 0
 
 function session() {
   const { profile, state } = useProfile()
-  const initData = getTelegramWebApp()?.initData
-  if (state.value !== 'authenticated' || !profile.value || !initData) {
-    throw new ApiError(401, 'unauthorized')
+  // The backend authorizes requests, including browser requests without initData.
+  return {
+    initData: getTelegramWebApp()?.initData || '',
+    userID: state.value === 'authenticated' ? profile.value?.id : undefined,
+    version: sessionVersion,
   }
-  return { initData, userID: profile.value.id, version: sessionVersion }
 }
 
 function resetWatches() {
@@ -51,7 +52,7 @@ async function loadWatches() {
       void loadWatches()
       return
     }
-    if (result.some((watch) => watch.user_id !== current.userID)) {
+    if (current.userID !== undefined && result.some((watch) => watch.user_id !== current.userID)) {
       throw new ApiError(200, 'invalid_response')
     }
     watches.value = result
@@ -73,7 +74,7 @@ async function createWatch(input: CreateWatchInput): Promise<Watch> {
   try {
     const watch = await postWatch(current.initData, input)
     if (current.version !== sessionVersion) throw new ApiError(401, 'unauthorized')
-    if (watch.user_id !== current.userID) throw new ApiError(201, 'invalid_response')
+    if (current.userID !== undefined && watch.user_id !== current.userID) throw new ApiError(201, 'invalid_response')
     mutationVersion++
     watches.value = [watch, ...watches.value.filter((item) => item.id !== watch.id)]
     // Recover a list that failed before this successful create.
