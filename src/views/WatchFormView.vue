@@ -15,7 +15,7 @@ import { useTrains } from '../composables/useTrains'
 import { useLocale } from '../lib/i18n'
 import { ApiError, apiErrorMessage } from '../lib/api'
 import { isValidDate, todayInUzbekistan } from '../lib/dates'
-import { positions, wagonTypes, zones } from '../types/watch'
+import { positions, selectableWagonTypes, zones } from '../types/watch'
 import type { DraftInput, TrainClass } from '../types/watch'
 import type { TrainSearchParams } from '../types/train'
 
@@ -29,12 +29,14 @@ const { stations, loading: stationsLoading, loaded: stationsLoaded, errorMessage
 const { t, locale } = useLocale()
 const draftID = typeof route.params.id === 'string' ? route.params.id : undefined
 const editingDraft = draftID ? drafts.value.find((draft) => draft.id === draftID) : undefined
+const availableDraftWagons = editingDraft?.wagonTypes.filter((type) => selectableWagonTypes.some((option) => option.value === type)) ?? []
+const hasUnavailableDraftWagons = !!editingDraft && availableDraftWagons.length !== editingDraft.wagonTypes.length
 const missingDraft = !!draftID && !editingDraft
 const title = computed(() => missingDraft ? 'Qoralama topilmadi' : draftID ? 'Qoralamadan kuzatuv yaratish' : 'Yangi kuzatuv')
 const formElement = ref<HTMLFormElement | null>(null)
 const saveErrorElement = ref<HTMLParagraphElement | null>(null)
 const form = ref<DraftInput>(editingDraft
-  ? { from: editingDraft.from, to: editingDraft.to, travelDate: editingDraft.travelDate, position: editingDraft.position, zone: editingDraft.zone, wagonTypes: [...editingDraft.wagonTypes] }
+  ? { from: editingDraft.from, to: editingDraft.to, travelDate: editingDraft.travelDate, position: editingDraft.position, zone: editingDraft.zone, wagonTypes: availableDraftWagons }
   : { from: '', to: '', travelDate: '', position: 'all', zone: 'all', wagonTypes: [] })
 const errors = ref<Record<string, string>>({})
 const saveError = ref('')
@@ -54,9 +56,25 @@ const trainQuery = computed<TrainSearchParams | null>(() => {
     : null
 })
 const { trains, loading: trainsLoading, errorMessage: trainsError, loadTrains } = useTrains(trainQuery)
+const hasSelectedHighSpeedTrain = computed(() => trains.value.some((train) => {
+  if (!selectedTrainNumbers.value.includes(train.number)) return false
+  const brand = train.brand.normalize('NFKC').toLowerCase()
+  return ['afrosiyob', 'afrosiab', 'афросиаб', 'афросиёб', 'афросиоб', 'manguberdi', 'мангуберди']
+    .some((name) => brand.includes(name))
+}))
+const showTrainClasses = computed(() => !trainsLoading.value && !trainsError.value && hasSelectedHighSpeedTrain.value)
 
 watch(() => [form.value.from, form.value.to, form.value.travelDate], () => {
   selectedTrainNumbers.value = []
+  selectedTrainClasses.value = []
+  classError.value = ''
+})
+
+watch([hasSelectedHighSpeedTrain, trainsLoading], ([hasHighSpeedTrain, loading]) => {
+  // A language change reloads train names; retain class choices during that request.
+  if (loading || hasHighSpeedTrain) return
+  selectedTrainClasses.value = []
+  classError.value = ''
 })
 
 watch(stations, () => {
@@ -110,10 +128,10 @@ async function save() {
       trip_date: form.value.travelDate,
       filters: {
         trains: [...selectedTrainNumbers.value],
-        classes: [...selectedTrainClasses.value],
+        classes: showTrainClasses.value ? [...selectedTrainClasses.value] : [],
         position: form.value.position,
         zone: form.value.zone,
-        wagon_types: [...form.value.wagonTypes],
+        wagon_types: form.value.wagonTypes.filter((type) => selectableWagonTypes.some((option) => option.value === type)),
       },
     })
   } catch (error) {
@@ -167,12 +185,11 @@ async function save() {
           <h2><span class="form-section-icon"><AppIcon name="seat" :size="20" /></span> {{ t('Qulay joyingiz') }}</h2>
           <fieldset><legend>{{ t('Joy pozitsiyasi') }}</legend><div class="segmented-control"><label v-for="option in positions" :key="option.value" :class="{ selected: form.position === option.value }"><input v-model="form.position" type="radio" name="position" :value="option.value" /><span>{{ t(option.label) }}</span></label></div></fieldset>
           <fieldset><legend>{{ t('Joy zonasi') }}</legend><div class="segmented-control"><label v-for="option in zones" :key="option.value" :class="{ selected: form.zone === option.value }"><input v-model="form.zone" type="radio" name="zone" :value="option.value" /><span>{{ t(option.label) }}</span></label></div><p class="field-hint">{{ t('Yon joylar — platskart vagonining yo‘lak tomonidagi joylar.') }}</p></fieldset>
-          <fieldset><legend>{{ t('Vagon turi') }} <span class="text-muted">{{ t('· ixtiyoriy') }}</span></legend><div class="wagon-options"><label v-for="option in wagonTypes" :key="option.value" :class="{ selected: form.wagonTypes.includes(option.value) }"><input v-model="form.wagonTypes" type="checkbox" :value="option.value" /><AppIcon v-if="form.wagonTypes.includes(option.value)" name="check" :size="14" /><span>{{ t(option.label) }}</span></label></div><p class="field-hint">{{ t('Tanlanmasa, barcha vagon turlari hisobga olinadi.') }}</p></fieldset>
+          <fieldset><legend>{{ t('Vagon turi') }} <span class="text-muted">{{ t('· ixtiyoriy') }}</span></legend><div class="wagon-options"><label v-for="option in selectableWagonTypes" :key="option.value" :class="{ selected: form.wagonTypes.includes(option.value) }"><input v-model="form.wagonTypes" type="checkbox" :value="option.value" /><AppIcon v-if="form.wagonTypes.includes(option.value)" name="check" :size="14" /><span>{{ t(option.label) }}</span></label></div><p class="field-hint">{{ t('Tanlanmasa, barcha vagon turlari hisobga olinadi.') }}</p><p v-if="hasUnavailableDraftWagons" class="inline-warning">{{ t('Avvalgi qoralamadagi ayrim vagon turlari hozir tanlanmaydi. Vagon turini qayta tanlang.') }}</p></fieldset>
           <p v-if="filterError" class="field-error save-error" role="alert">{{ t(filterError) }}</p>
         </section>
-        <TrainClassSelect v-model="selectedTrainClasses" :error="classError" />
+        <TrainClassSelect v-if="showTrainClasses" v-model="selectedTrainClasses" :error="classError" />
       </fieldset>
-      <div class="info-box"><AppIcon name="shield" :size="19" /><p><strong>{{ t('Kuzatuv hisobingizga saqlanadi.') }}</strong> {{ t('Joylarni avtomatik tekshirish va Telegram xabarlari keyingi bosqichda ulanadi.') }}</p></div>
       <p v-if="saveError" ref="saveErrorElement" class="field-error save-error" role="alert" tabindex="-1">{{ t(saveError) }}</p>
       <div class="form-actions"><div class="form-actions-inner"><button class="button button-secondary" type="button" :disabled="saving" @click="goBack">{{ t('Bekor qilish') }}</button><button class="button button-primary" type="submit" :disabled="saving || stationsLoading || !stationsLoaded || trainsLoading || !!trainsError"><AppIcon :name="saving ? 'clock' : 'check'" :size="18" /> {{ saving ? t('Saqlanmoqda…') : t('Kuzatuvni saqlash') }}</button></div></div>
     </form>

@@ -9,6 +9,7 @@ const paths: Record<string, string[]> = {
   user: ['M20 21v-2a7 7 0 0 0-14 0v2', 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z'],
   plus: ['M12 5v14M5 12h14'],
   play: ['m8 5 11 7-11 7V5Z'],
+  pause: ['M7 5h3v14H7Z', 'M14 5h3v14h-3Z'],
   arrow: ['M4 12h16m-6-6 6 6-6 6'],
   back: ['M20 12H4m6-6-6 6 6 6'],
   chevron: ['m9 5 7 7-7 7'],

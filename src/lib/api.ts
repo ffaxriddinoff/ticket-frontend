@@ -73,7 +73,7 @@ async function request(path: string, initData: string, options: RequestInit = {}
 }
 
 export async function getProfile(initData: string, signal: AbortSignal): Promise<UserProfile> {
-  const { response, body } = await request('/api/v1/me', initData, { signal })
+  const { response, body } = await request('/api/v1/me', initData, { signal }, import.meta.env.DEV)
   if (!isRecord(body) || !isProfile(body.data)) {
     throw new ApiError(response.status, 'invalid_response')
   }
@@ -163,6 +163,14 @@ export async function deleteWatch(initData: string, id: number, signal?: AbortSi
   if (response.status !== 204) throw new ApiError(response.status, 'invalid_response')
 }
 
+export async function setWatchActive(initData: string, id: number, isActive: boolean, signal?: AbortSignal): Promise<void> {
+  const action = isActive ? 'resume' : 'pause'
+  const { response } = await request(`/api/v1/watches/${id}/${action}`, initData, {
+    method: 'PATCH', signal,
+  }, true)
+  if (response.status !== 204) throw new ApiError(response.status, 'invalid_response')
+}
+
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Telegram orqali kirish talab qilinadi. Mini App’ni Telegram’dan oching yoki qayta ishga tushiring.'
@@ -204,12 +212,14 @@ function parseWatch(value: unknown): Watch | null {
     || !wagons.every((type) => wagonTypes.some((option) => option.value === type))
     || !Number.isSafeInteger(value.id) || (value.id as number) <= 0
     || !Number.isSafeInteger(value.user_id) || (value.user_id as number) <= 0
+    || typeof value.is_active !== 'boolean'
     || typeof value.from !== 'string' || typeof value.to !== 'string'
     || typeof value.trip_date !== 'string' || !isValidDate(value.trip_date)
     || typeof value.created_at !== 'string' || !Number.isFinite(Date.parse(value.created_at))
     || typeof value.updated_at !== 'string' || !Number.isFinite(Date.parse(value.updated_at))) return null
   return {
     id: value.id as number, user_id: value.user_id as number,
+    is_active: value.is_active,
     from: value.from, to: value.to, trip_date: value.trip_date,
     created_at: value.created_at, updated_at: value.updated_at,
     filters: {

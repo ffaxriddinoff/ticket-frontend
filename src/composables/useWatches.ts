@@ -1,5 +1,5 @@
 import { ref, shallowReadonly } from 'vue'
-import { ApiError, apiErrorMessage, createWatch as postWatch, deleteWatch, getWatches } from '../lib/api'
+import { ApiError, apiErrorMessage, createWatch as postWatch, deleteWatch, getWatches, setWatchActive as patchWatchActive } from '../lib/api'
 import { getTelegramWebApp } from '../lib/telegram'
 import type { CreateWatchInput, Watch } from '../types/watch'
 import { useProfile } from './useProfile'
@@ -10,6 +10,7 @@ const loaded = ref(false)
 const errorMessage = ref('')
 const creating = ref(false)
 const deletingIds = ref(new Set<number>())
+const updatingIds = ref(new Set<number>())
 let activeRequest: AbortController | null = null
 let sessionVersion = 0
 let mutationVersion = 0
@@ -35,6 +36,7 @@ function resetWatches() {
   errorMessage.value = ''
   creating.value = false
   deletingIds.value = new Set()
+  updatingIds.value = new Set()
 }
 
 async function loadWatches() {
@@ -86,7 +88,7 @@ async function createWatch(input: CreateWatchInput): Promise<Watch> {
 }
 
 async function removeWatch(id: number): Promise<void> {
-  if (deletingIds.value.has(id)) return
+  if (deletingIds.value.has(id) || updatingIds.value.has(id)) return
   const current = session()
   deletingIds.value = new Set([...deletingIds.value, id])
   try {
@@ -107,6 +109,28 @@ async function removeWatch(id: number): Promise<void> {
   }
 }
 
+async function setWatchActive(id: number, isActive: boolean): Promise<void> {
+  if (updatingIds.value.has(id) || deletingIds.value.has(id)) return
+  const watch = watches.value.find((item) => item.id === id)
+  if (!watch) throw new ApiError(404, 'watch_not_found')
+  if (watch.is_active === isActive) return
+
+  const current = session()
+  updatingIds.value = new Set([...updatingIds.value, id])
+  try {
+    await patchWatchActive(current.initData, id, isActive)
+    if (current.version !== sessionVersion) throw new ApiError(401, 'unauthorized')
+    mutationVersion++
+    watches.value = watches.value.map((item) => item.id === id ? { ...item, is_active: isActive } : item)
+  } finally {
+    if (current.version === sessionVersion) {
+      const next = new Set(updatingIds.value)
+      next.delete(id)
+      updatingIds.value = next
+    }
+  }
+}
+
 export function useWatches() {
   return {
     watches: shallowReadonly(watches),
@@ -115,6 +139,7 @@ export function useWatches() {
     errorMessage: shallowReadonly(errorMessage),
     creating: shallowReadonly(creating),
     deletingIds: shallowReadonly(deletingIds),
-    loadWatches, resetWatches, createWatch, removeWatch,
+    updatingIds: shallowReadonly(updatingIds),
+    loadWatches, resetWatches, createWatch, removeWatch, setWatchActive,
   }
 }

@@ -1,10 +1,18 @@
 // Uzbek is the source language; each entry contains Russian and English.
 export const messages: Record<string, readonly [string, string]> = {
   "Davom": ["Продолжить", "Resume"],
+  "Pauza": ["Пауза", "Pause"],
+  "Pauza qilinmoqda…": ["Приостанавливаем…", "Pausing…"],
+  "Davom ettirilmoqda…": ["Возобновляем…", "Resuming…"],
+  "Kuzatuv pauza qilindi.": ["Наблюдение приостановлено.", "Watch paused."],
+  "Kuzatuv davom ettirildi.": ["Наблюдение возобновлено.", "Watch resumed."],
+  "Kuzatuvni pauza qilib bo‘lmadi.": ["Не удалось приостановить наблюдение.", "Could not pause the watch."],
+  "Kuzatuvni davom ettirib bo‘lmadi.": ["Не удалось возобновить наблюдение.", "Could not resume the watch."],
   "O‘chirish": ["Удалить", "Delete"],
   "Tez orada": ["Скоро", "Coming soon"],
   "Tezyurar": ["Скоростные поезда", "High-speed trains"],
   "Afrosiyob, Jaloliddin Manguberdi": ["Афросиаб, Жалолиддин Мангуберди", "Afrosiyob, Jaloliddin Manguberdi"],
+  "Avvalgi qoralamadagi ayrim vagon turlari hozir tanlanmaydi. Vagon turini qayta tanlang.": ["Некоторые типы вагонов из старого черновика сейчас недоступны. Выберите тип вагона заново.", "Some carriage types from the previous draft are currently unavailable. Choose your carriage type again."],
   "Tanlanmasa, barcha klasslar kuzatiladi. Bir yoki bir nechta klassni tanlashingiz mumkin.": ["Если ничего не выбрать, отслеживаются все классы. Можно выбрать один или несколько.", "Leave empty to watch all classes. You can select one or more."],
   "Poyezd klassi": ["Класс поезда", "Train class"],
   "Ekonom": ["Эконом", "Economy"],

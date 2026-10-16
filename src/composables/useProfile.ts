@@ -11,16 +11,21 @@ let activeRequest: AbortController | null = null
 
 async function loadProfile() {
   activeRequest?.abort()
+  activeRequest = null
   const webApp = getTelegramWebApp()
-  if (!webApp?.initData) {
+  const initData = webApp?.initData ?? ''
+  if (!initData && !import.meta.env.DEV) {
     profile.value = null
     state.value = 'browser'
+    errorMessage.value = ''
     return
   }
-  webApp.ready()
-  webApp.expand()
-  webApp.setHeaderColor?.('#f6f8f5')
-  webApp.setBackgroundColor?.('#f6f8f5')
+  if (initData && webApp) {
+    webApp.ready()
+    webApp.expand()
+    webApp.setHeaderColor?.('#f6f8f5')
+    webApp.setBackgroundColor?.('#f6f8f5')
+  }
   const controller = new AbortController()
   activeRequest = controller
   const timeout = window.setTimeout(() => controller.abort(), 12_000)
@@ -28,7 +33,7 @@ async function loadProfile() {
   state.value = 'loading'
   errorMessage.value = ''
   try {
-    const user = await getProfile(webApp.initData, controller.signal)
+    const user = await getProfile(initData, controller.signal)
     if (activeRequest !== controller) return
     profile.value = user
     state.value = 'authenticated'

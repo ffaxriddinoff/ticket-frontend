@@ -21,6 +21,9 @@ export const wagonTypes: { value: WagonType; label: string }[] = [
   { value: 'sv', label: 'SV' },
   { value: 'general', label: 'Umumiy' },
 ]
+// Keep the complete catalog above to read existing watches and local drafts.
+export const selectableWagonTypes = wagonTypes.filter((option) => option.value === 'platzkart' || option.value === 'coupe')
+
 export const trainClasses: { value: TrainClass; label: string }[] = [
   { value: 'economy', label: 'Ekonom' },
   { value: 'business', label: 'Biznes' },
@@ -46,6 +49,7 @@ export interface CreateWatchInput {
 export interface Watch extends CreateWatchInput {
   id: number
   user_id: number
+  is_active: boolean
   created_at: string
   updated_at: string
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useLocale } from '../lib/i18n'
 import AppIcon from './AppIcon.vue'
 import { useWatches } from '../composables/useWatches'
@@ -12,12 +13,30 @@ import type { Watch } from '../types/watch'
 const { t } = useLocale()
 
 const props = defineProps<{ watch: Watch }>()
-const { removeWatch, deletingIds } = useWatches()
+const { removeWatch, deletingIds, setWatchActive, updatingIds } = useWatches()
 const { notify } = useNotice()
 const { stationName } = useStations()
+const updating = computed(() => updatingIds.value.has(props.watch.id))
+const busy = computed(() => updating.value || deletingIds.value.has(props.watch.id))
+const actionLabel = computed(() => updating.value
+  ? props.watch.is_active ? 'Pauza qilinmoqda…' : 'Davom ettirilmoqda…'
+  : props.watch.is_active ? 'Pauza' : 'Davom')
+
+async function toggleActive() {
+  if (busy.value) return
+  const isActive = !props.watch.is_active
+  try {
+    await setWatchActive(props.watch.id, isActive)
+    notify(isActive ? 'Kuzatuv davom ettirildi.' : 'Kuzatuv pauza qilindi.')
+  } catch (error) {
+    notify(apiErrorMessage(error, isActive
+      ? 'Kuzatuvni davom ettirib bo‘lmadi.'
+      : 'Kuzatuvni pauza qilib bo‘lmadi.'), true)
+  }
+}
 
 async function remove() {
-  if (deletingIds.value.has(props.watch.id)) return
+  if (busy.value) return
   try {
     await removeWatch(props.watch.id)
     notify('Kuzatuv o‘chirildi.')
@@ -28,7 +47,7 @@ async function remove() {
 </script>
 
 <template>
-  <article class="draft-card" :aria-busy="deletingIds.has(watch.id)">
+  <article class="draft-card" :aria-busy="busy">
     <div v-if="watch.trip_date < todayInUzbekistan()" class="draft-card-heading">
       <span class="caption text-warning">{{ t('Sana o‘tgan') }}</span>
     </div>
@@ -43,16 +62,15 @@ async function remove() {
       <span v-for="trainClass in watch.filters.classes" :key="`class-${trainClass}`">{{ t('Klass:') }} {{ t(trainClasses.find((option) => option.value === trainClass)?.label ?? trainClass) }}</span>
     </div>
     <div class="watch-card-actions">
-      <!-- Enable resume/edit after their backend API contracts are available. -->
-      <button class="watch-card-action watch-action-resume" type="button" disabled :title="t('Tez orada')">
-        <span class="watch-action-icon"><AppIcon name="play" :size="19" /></span>
-        <span>{{ t('Davom') }}</span>
+      <button class="watch-card-action" :class="watch.is_active ? 'watch-action-pause' : 'watch-action-resume'" type="button" :disabled="busy" :aria-label="`${stationName(watch.from)} — ${stationName(watch.to)}: ${t(actionLabel)}`" @click="toggleActive">
+        <span class="watch-action-icon"><span v-if="updating" class="loading-spinner" aria-hidden="true"></span><AppIcon v-else :name="watch.is_active ? 'pause' : 'play'" :size="19" /></span>
+        <span>{{ t(actionLabel) }}</span>
       </button>
       <button class="watch-card-action watch-action-edit" type="button" disabled :title="t('Tez orada')">
         <span class="watch-action-icon"><AppIcon name="edit" :size="19" /></span>
         <span>{{ t('Tahrirlash') }}</span>
       </button>
-      <button class="watch-card-action watch-action-delete" type="button" :disabled="deletingIds.has(watch.id)" :aria-label="`${stationName(watch.from)} — ${stationName(watch.to)}: ${t('Kuzatuvni o‘chirish')}`" @click="remove">
+      <button class="watch-card-action watch-action-delete" type="button" :disabled="busy" :aria-label="`${stationName(watch.from)} — ${stationName(watch.to)}: ${t('Kuzatuvni o‘chirish')}`" @click="remove">
         <span class="watch-action-icon"><AppIcon :name="deletingIds.has(watch.id) ? 'clock' : 'trash'" :size="19" /></span>
         <span>{{ deletingIds.has(watch.id) ? t('O‘chirilmoqda…') : t('O‘chirish') }}</span>
       </button>
@@ -69,7 +87,10 @@ async function remove() {
 .watch-card-action:focus-visible { outline-color: var(--action-color); outline-offset: 2px; }
 .watch-action-icon { display: grid; place-items: center; width: 34px; height: 32px; border-radius: 9px; background: var(--action-background); }
 .watch-action-resume { --action-color: #15945b; --action-background: #eaf8ef; }
+.watch-action-pause { --action-color: #a77b12; --action-background: #fff5d9; }
 .watch-action-edit { --action-color: #2789d2; --action-background: #edf5ff; }
 .watch-action-delete { --action-color: #d85858; --action-background: #fff0ed; }
-.watch-action-resume .watch-action-icon :deep(svg) { fill: currentColor; stroke: none; }
+.watch-action-resume .watch-action-icon :deep(svg), .watch-action-pause .watch-action-icon :deep(svg) { fill: currentColor; stroke: none; }
+.watch-action-icon .loading-spinner { width: 18px; height: 18px; margin: 0; border-width: 2px; border-color: var(--action-background); border-top-color: currentColor; }
+@media (prefers-reduced-motion: reduce) { .watch-action-icon .loading-spinner { animation: none; } }
 </style>
